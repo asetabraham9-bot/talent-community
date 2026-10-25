@@ -1,24 +1,36 @@
 
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
+import app from "./app.js";
+import connectDB from "./config/db.js";
 
 dotenv.config();
 
-const app = express();
+const startServer = async () => {
+  try {
+    await connectDB();
 
-app.use(cors());
-app.use(express.json());
+    const PORT = process.env.PORT || 5000;
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Talent Community API is running!",
-  });
-});
+    const server = app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
 
-const PORT = process.env.PORT || 5000;
+    const shutdown = async (signal) => {
+      console.log(`${signal} received. Shutting down...`);
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+      server.close(async () => {
+        await mongoose.disconnect();
+        process.exit(0);
+      });
+    };
+
+    process.once("SIGINT", () => shutdown("SIGINT"));
+    process.once("SIGTERM", () => shutdown("SIGTERM"));
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
