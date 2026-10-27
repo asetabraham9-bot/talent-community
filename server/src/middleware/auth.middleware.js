@@ -1,3 +1,4 @@
+
 import jwt from "jsonwebtoken";
 import { findUserById } from "../repositories/user.repository.js";
 
@@ -24,7 +25,7 @@ export const protect = async (req, res, next) => {
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-      return next(new Error("JWT_SECRET is not configured."));
+      throw new Error("JWT_SECRET is not configured.");
     }
 
     const decoded = jwt.verify(token, secret);
@@ -45,7 +46,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Always use the database record as the source of current role/status.
     req.user = {
       id: user._id.toString(),
       role: user.role,
@@ -54,9 +54,9 @@ export const protect = async (req, res, next) => {
     return next();
   } catch (error) {
     if (
-      error.name === "JsonWebTokenError" ||
-      error.name === "TokenExpiredError" ||
-      error.name === "NotBeforeError"
+      ["JsonWebTokenError", "TokenExpiredError", "NotBeforeError"].includes(
+        error.name
+      )
     ) {
       return res.status(401).json({
         success: false,
@@ -68,22 +68,26 @@ export const protect = async (req, res, next) => {
   }
 };
 
-export const authorize = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-    }
+export const authorize = (...allowedRoles) => (req, res, next) => {
+  console.log("[AUTHORIZATION DEBUG]", {
+    path: req.originalUrl,
+    actualRole: req.user?.role,
+    allowedRoles,
+  });
 
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to access this resource.",
-      });
-    }
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
 
-    return next();
-  };
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: "You do not have permission to access this resource.",
+    });
+  }
+
+  return next();
 };

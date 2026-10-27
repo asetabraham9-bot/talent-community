@@ -1,9 +1,12 @@
+
 import { Router } from "express";
+
 import {
   getMyProfile,
   createMyProfile,
   updateMyProfile,
 } from "../controllers/organization-profile.controller.js";
+
 import {
   protect,
   authorize,
@@ -13,8 +16,8 @@ const router = Router();
 
 router.use(protect, authorize("organization"));
 
-router.get("/organization/profile", getMyProfile);
-router.post("/organization/profile", createMyProfile);
-router.patch("/organization/profile", updateMyProfile);
+router.get("/profile", getMyProfile);
+router.post("/profile", createMyProfile);
+router.patch("/profile", updateMyProfile);
 
 export default router;

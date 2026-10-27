@@ -1,3 +1,4 @@
+
 import {
   createOrganizationProfile,
   findOrganizationProfileByUserId,
@@ -19,7 +20,7 @@ const editableFields = [
   "contactEmail",
 ];
 
-const pickEditableFields = (data) => {
+const pickEditableFields = (data = {}) => {
   const updates = {};
 
   for (const field of editableFields) {
@@ -39,7 +40,8 @@ export const createMyOrganizationProfile = async (
   userId,
   data = {}
 ) => {
-  const existingProfile = await findOrganizationProfileByUserId(userId);
+  const existingProfile =
+    await findOrganizationProfileByUserId(userId);
 
   if (existingProfile) {
     throw createServiceError(
@@ -49,6 +51,25 @@ export const createMyOrganizationProfile = async (
   }
 
   const profileData = pickEditableFields(data);
+
+  const requiredFields = [
+    "organizationName",
+    "organizationType",
+    "description",
+  ];
+
+  const missingFields = requiredFields.filter(
+    (field) =>
+      typeof profileData[field] !== "string" ||
+      !profileData[field].trim()
+  );
+
+  if (missingFields.length > 0) {
+    throw createServiceError(
+      `Missing required fields: ${missingFields.join(", ")}.`,
+      400
+    );
+  }
 
   return createOrganizationProfile({
     ...profileData,
@@ -60,7 +81,8 @@ export const updateMyOrganizationProfile = async (
   userId,
   data = {}
 ) => {
-  const profile = await findOrganizationProfileByUserId(userId);
+  const profile =
+    await findOrganizationProfileByUserId(userId);
 
   if (!profile) {
     throw createServiceError(
@@ -78,5 +100,8 @@ export const updateMyOrganizationProfile = async (
     );
   }
 
-  return updateOrganizationProfileById(profile._id, updates);
+  return updateOrganizationProfileById(
+    profile._id,
+    updates
+  );
 };

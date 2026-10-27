@@ -14,8 +14,8 @@ const router = Router();
 
 router.use(protect, authorize("talent"));
 
-router.get("/talent/profile", getMyProfile);
-router.post("/talent/profile", createMyProfile);
-router.patch("/talent/profile", updateMyProfile);
+router.get("/profile", getMyProfile);
+router.post("/profile", createMyProfile);
+router.patch("/profile", updateMyProfile);
 
 export default router;

@@ -1,3 +1,4 @@
+
 import {
   getMyOrganizationProfile,
   createMyOrganizationProfile,
@@ -6,7 +7,9 @@ import {
 
 export const getMyProfile = async (req, res, next) => {
   try {
-    const profile = await getMyOrganizationProfile(req.user.id);
+    const profile = await getMyOrganizationProfile(
+      req.user.id
+    );
 
     return res.status(200).json({
       success: true,
@@ -17,8 +20,12 @@ export const getMyProfile = async (req, res, next) => {
   }
 };
 
+
 export const createMyProfile = async (req, res, next) => {
   try {
+    console.log("CONTENT-TYPE:", req.headers["content-type"]);
+    console.log("REQUEST BODY:", JSON.stringify(req.body));
+
     const profile = await createMyOrganizationProfile(
       req.user.id,
       req.body ?? {}
@@ -33,6 +40,7 @@ export const createMyProfile = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 export const updateMyProfile = async (req, res, next) => {
   try {

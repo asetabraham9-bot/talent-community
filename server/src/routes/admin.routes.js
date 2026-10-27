@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 import { getMyProfile } from "../controllers/admin.controller.js";
 import {
@@ -7,6 +8,11 @@ import {
 
 const router = Router();
 
-router.get("/profile", protect, authorize("admin"), getMyProfile);
+router.get(
+  "/profile",
+  protect,
+  authorize("admin"),
+  getMyProfile
+);
 
 export default router;
