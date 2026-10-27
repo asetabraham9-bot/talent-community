@@ -97,7 +97,7 @@ const projectSchema = new mongoose.Schema(
   {
     timestamps: true,
     versionKey: false,
-  }
+  },
 );
 
 projectSchema.index({ contributors: 1 });
