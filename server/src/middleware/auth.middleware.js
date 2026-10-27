@@ -69,13 +69,8 @@ export const protect = async (req, res, next) => {
 };
 
 export const authorize = (...allowedRoles) => (req, res, next) => {
-  console.log("[AUTHORIZATION DEBUG]", {
-    path: req.originalUrl,
-    actualRole: req.user?.role,
-    allowedRoles,
-  });
 
-  if (!req.user) {
+ if (!req.user) {
     return res.status(401).json({
       success: false,
       message: "Authentication required.",

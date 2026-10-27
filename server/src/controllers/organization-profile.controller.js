@@ -58,3 +58,6 @@ export const updateMyProfile = async (req, res, next) => {
     return next(error);
   }
 };
+export const countOrganizationProfiles = (filter = {}) => {
+  return OrganizationProfile.countDocuments(filter);
+};

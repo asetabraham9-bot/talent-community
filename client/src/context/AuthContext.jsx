@@ -8,37 +8,60 @@ import {
 
 const AuthContext = createContext(null);
 
+const USER_KEY = "talent-community-user";
+const TOKEN_KEY = "talent-community-token";
+
+function readStoredUser() {
+  try {
+    const savedUser = sessionStorage.getItem(USER_KEY);
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = sessionStorage.getItem("talent-community-user");
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState(readStoredUser);
+  const [token, setToken] = useState(
+    () => sessionStorage.getItem(TOKEN_KEY)
+  );
 
   useEffect(() => {
     if (user) {
-      sessionStorage.setItem(
-        "talent-community-user",
-        JSON.stringify(user)
-      );
+      sessionStorage.setItem(USER_KEY, JSON.stringify(user));
     } else {
-      sessionStorage.removeItem("talent-community-user");
+      sessionStorage.removeItem(USER_KEY);
     }
   }, [user]);
 
-  function login(userData) {
-    setUser(userData);
+  useEffect(() => {
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+  }, [token]);
+
+  function login(authData) {
+    setUser(authData.user);
+    setToken(authData.token);
   }
 
   function logout() {
     setUser(null);
+    setToken(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        isAuthenticated: Boolean(user && token),
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

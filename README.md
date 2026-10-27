@@ -29,3 +29,7 @@ Initial setup and architecture.
 
 ## Local Development
 Setup instructions will be added as the application is implemented.
+
+Method	Endpoint	Purpose
+PATCH	/api/admin/organizations/:id/verify	Verify an organization
+PATCH	/api/admin/organizations/:id/reject	Reject with a reason

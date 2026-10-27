@@ -42,3 +42,7 @@ export const updateOrganizationProfileById = (
     }
   );
 };
+
+export const countOrganizationProfiles = (filter = {}) => {
+  return OrganizationProfile.countDocuments(filter);
+};
