@@ -1,421 +1,589 @@
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  BookOpen,
+  BriefcaseBusiness,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Globe2,
+  GraduationCap,
+  MapPin,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Users,
+} from "lucide-react";
+
 import { apiRequest } from "../../services/api";
 import PublicHeader from "../../components/navigation/PublicHeader";
 import PublicFooter from "../../components/navigation/PublicFooter";
 
-function formatDeadline(value) {
-  if (!value) return "Not specified";
-
-  const date = new Date(value);
-
+// ─── Helpers ────────────────────────────────────────────────
+function formatDeadline(deadline) {
+  if (!deadline) return "Not specified";
+  const date = new Date(deadline);
   if (Number.isNaN(date.getTime())) return "Not specified";
+  return date.toLocaleDateString("en-ET", { day: "numeric", month: "short", year: "numeric" });
+}
 
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+function getDaysRemaining(deadline) {
+  if (!deadline) return null;
+  const time = new Date(deadline).getTime();
+  if (Number.isNaN(time)) return null;
+  return Math.ceil((time - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function formatCategory(category) {
+  if (!category) return "General";
+  return category.replace(/[-_]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+function getLocation(location) {
+  if (!location) return "Location not specified";
+  if (typeof location === "string") return location;
+  return [location.city, location.region, location.country].filter(Boolean).join(", ") || "Location not specified";
+}
+
+// ─── Motion variants ─────────────────────────────────────────
+const fadeUp = (delay = 0) => ({
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, delay, ease: "easeOut" } },
+});
+
+const container = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const cardAnim = {
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
+// ─── Sub-components ──────────────────────────────────────────
+function ChallengeCard({ challenge }) {
+  const daysRemaining = getDaysRemaining(challenge.deadline);
+
+  return (
+    <motion.article
+      variants={cardAnim}
+      className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl hover:shadow-slate-900/5 sm:p-6"
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
+          {formatCategory(challenge.category)}
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Published
+        </span>
+      </div>
+
+      <h3 className="mb-3 text-xl font-bold leading-snug text-slate-900 transition-colors group-hover:text-teal-700">
+        {challenge.title}
+      </h3>
+
+      <p className="mb-5 line-clamp-3 flex-1 text-sm leading-7 text-slate-600">
+        {challenge.description ?? "Explore this opportunity and learn more about its expected outcomes."}
+      </p>
+
+      <div className="space-y-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
+        <div className="flex items-start gap-2.5">
+          <MapPin size={17} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
+          <span>{getLocation(challenge.location)}</span>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <Globe2 size={17} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
+          <span className="capitalize">
+            {challenge.participationType ? challenge.participationType.replace(/[-_]/g, " ") : "Participation type not specified"}
+          </span>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <CalendarDays size={17} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
+          <span>Deadline: {formatDeadline(challenge.deadline)}</span>
+        </div>
+
+        {Array.isArray(challenge.requiredSkills) && challenge.requiredSkills.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {challenge.requiredSkills.slice(0, 3).map((skill) => (
+              <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                {skill}
+              </span>
+            ))}
+            {challenge.requiredSkills.length > 3 && (
+              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                +{challenge.requiredSkills.length - 3} more
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {daysRemaining !== null && (
+        <p className="mt-4 flex items-center gap-2 text-xs font-medium">
+          <Clock3 size={14} aria-hidden="true" />
+          <span className={daysRemaining < 0 ? "text-red-600" : daysRemaining <= 7 ? "text-amber-700" : "text-slate-500"}>
+            {daysRemaining < 0 ? "Deadline passed" : daysRemaining === 0 ? "Deadline is today" : `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`}
+          </span>
+        </p>
+      )}
+
+      <Link
+        to={`/challenges/${challenge._id}`}
+        className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800 transition-all duration-200 hover:border-teal-700 hover:bg-teal-50 hover:text-teal-800"
+      >
+        Explore opportunity
+        <ArrowUpRight size={17} aria-hidden="true" />
+      </Link>
+    </motion.article>
+  );
 }
 
 function SectionHeading({ eyebrow, title, description }) {
   return (
-    <div className="mx-auto mb-10 max-w-2xl text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
-        {eyebrow}
-      </p>
-      <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-        {title}
-      </h2>
-      <p className="mt-4 text-base leading-7 text-slate-600">
-        {description}
-      </p>
-    </div>
+    <motion.div
+      variants={fadeUp(0)}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-80px" }}
+      className="mx-auto mb-12 max-w-2xl text-center"
+    >
+      <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">{eyebrow}</p>
+      <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{title}</h2>
+      <p className="mt-4 leading-7 text-slate-600">{description}</p>
+    </motion.div>
   );
 }
 
-function ChallengeCard({ challenge }) {
-  return (
-    <article className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-xl hover:shadow-slate-900/5">
-      {challenge.category && (
-        <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
-          {challenge.category}
-        </span>
-      )}
+// ─── Stats ───────────────────────────────────────────────────
+const stats = [
+  { label: "Challenges published", value: "50+" },
+  { label: "Talented members", value: "200+" },
+  { label: "Organizations", value: "30+" },
+  { label: "Projects completed", value: "80+" },
+];
 
-      <h3 className="mt-4 text-lg font-bold leading-7 text-slate-900">
-        {challenge.title}
-      </h3>
-
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
-        {challenge.description || "Explore this opportunity to learn more."}
-      </p>
-
-      <div className="mt-5 space-y-2 text-sm text-slate-600">
-        <p>
-          <span className="font-semibold text-slate-800">Location: </span>
-          {challenge.location || "Not specified"}
-        </p>
-        <p>
-          <span className="font-semibold text-slate-800">Deadline: </span>
-          {formatDeadline(challenge.deadline)}
-        </p>
-      </div>
-
-      <div className="mt-auto pt-6">
-        <Link
-          to="/challenges"
-          className="inline-flex items-center gap-2 text-sm font-bold text-teal-700 transition group-hover:gap-3"
-        >
-          Explore challenges <span aria-hidden="true">→</span>
-        </Link>
-      </div>
-    </article>
-  );
-}
-
+// ─── Page ────────────────────────────────────────────────────
 export default function HomePage() {
   const [challenges, setChallenges] = useState([]);
-  const [challengeState, setChallengeState] = useState("loading");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadFeaturedChallenges() {
-      try {
-        const result = await apiRequest("/challenges?page=1&limit=3");
-
-        if (cancelled) return;
-
-        setChallenges(Array.isArray(result.data) ? result.data : []);
-        setChallengeState("success");
-      } catch {
-        if (cancelled) return;
-
-        setChallenges([]);
-        setChallengeState("error");
-      }
+  const fetchChallenges = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await apiRequest("/challenges?limit=3");
+      if (!Array.isArray(result.data)) throw new Error("Invalid response.");
+      setChallenges(result.data.slice(0, 3));
+    } catch (err) {
+      setChallenges([]);
+      setError(err.message || "Unable to load challenges.");
+    } finally {
+      setLoading(false);
     }
-
-    loadFeaturedChallenges();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
+  useEffect(() => {
+    fetchChallenges();
+  }, [fetchChallenges, retryCount]);
+
   return (
-    <div className="min-h-screen overflow-hidden bg-white text-slate-800">
+    <div className="min-h-screen overflow-x-hidden bg-white text-slate-800">
       <PublicHeader />
 
       <main>
-        <section className="relative isolate overflow-hidden bg-[#102c46]">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 animate-pulse rounded-full bg-teal-400/20 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -bottom-48 -left-24 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl"
-          />
+        {/* ─── Hero ──────────────────────────────────────────────── */}
+        <section className="relative isolate overflow-hidden bg-slate-950">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+            <div className="absolute -right-32 -top-32 h-96 w-96 animate-pulse rounded-full bg-teal-500/15 blur-3xl" />
+            <div className="absolute -bottom-48 -left-20 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+          </div>
 
-          <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-28">
-            <div className="animate-[fadeInUp_700ms_ease-out_both]">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold tracking-wide text-teal-200">
-                Skills. Opportunities. Growth.
-              </span>
+          <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-32">
+            <motion.div
+              variants={fadeUp(0)}
+              initial="hidden"
+              animate="visible"
+            >
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm text-teal-100">
+                <Sparkles size={16} className="text-teal-300" />
+                A place for talent to meet opportunity
+              </div>
 
-              <h1 className="mt-7 max-w-3xl text-4xl font-bold leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Your talent deserves{" "}
-                <span className="text-teal-300">an opportunity</span> to shine.
+              <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-6xl">
+                Your potential deserves a{" "}
+                <span className="text-teal-300">place to grow.</span>
               </h1>
 
-              <p className="mt-6 max-w-xl text-base leading-8 text-slate-300 sm:text-lg">
-                Discover meaningful challenges, showcase what you can do,
-                and connect with organizations that need your skills.
-                Turn your potential into practical experience.
+              <p className="mt-7 max-w-xl text-base leading-8 text-slate-300 sm:text-lg">
+                Discover real-world challenges, showcase what you can do, and
+                connect with organizations turning ideas into impact.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/challenges"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-teal-950/20 transition duration-200 hover:-translate-y-0.5 hover:bg-teal-400"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-teal-500 px-6 py-3 font-bold text-slate-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400"
                 >
-                  Explore challenges <span aria-hidden="true">→</span>
+                  Explore challenges
+                  <ArrowRight size={18} />
                 </Link>
-
                 <Link
                   to="/register"
-                  className="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/20 px-6 py-3 font-semibold text-white transition-all duration-200 hover:border-white/50 hover:bg-white/10"
                 >
                   Join the community
+                  <ArrowUpRight size={18} />
                 </Link>
               </div>
 
-              <p className="mt-6 text-sm text-slate-400">
-                For talented individuals and organizations across Ethiopia.
-              </p>
-            </div>
+              <a
+                href="#how-it-works"
+                className="mt-9 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
+              >
+                Discover how it works
+                <ArrowDown size={15} />
+              </a>
+            </motion.div>
 
-            <div className="relative mx-auto w-full max-w-lg animate-[fadeInUp_900ms_ease-out_both]">
-              <div className="absolute -inset-5 rounded-[2rem] bg-teal-400/10 blur-2xl" />
-
-              <div className="relative rounded-[2rem] border border-white/15 bg-white/[0.07] p-6 shadow-2xl backdrop-blur sm:p-8">
-                <div className="flex items-center justify-between">
+            {/* Hero card */}
+            <motion.div
+              variants={fadeUp(0.2)}
+              initial="hidden"
+              animate="visible"
+              className="relative hidden lg:block"
+            >
+              <div className="absolute -inset-6 rounded-[2rem] bg-teal-400/10 blur-2xl" />
+              <div className="relative rounded-3xl border border-white/10 bg-white/[0.06] p-7 shadow-2xl backdrop-blur-xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-6">
                   <div>
-                    <p className="text-sm font-semibold text-white">
-                      A place to move forward
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Make your next step count
-                    </p>
+                    <p className="text-sm text-slate-400">The journey starts here</p>
+                    <h2 className="mt-1 text-xl font-bold text-white">Discover your next step</h2>
                   </div>
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-teal-400/15 text-xl text-teal-200">
-                    ↗
-                  </span>
-                </div>
-
-                <div className="mt-7 space-y-4">
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/20 p-5 transition duration-300 hover:translate-x-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-teal-300">
-                      For talents
-                    </p>
-                    <h2 className="mt-2 text-lg font-bold text-white">
-                      Put your skills into practice.
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
-                      Build your profile and find challenges that help you
-                      learn, contribute, and grow.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/20 p-5 transition duration-300 hover:translate-x-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                      For organizations
-                    </p>
-                    <h2 className="mt-2 text-lg font-bold text-white">
-                      Find people ready to contribute.
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
-                      Share meaningful challenges and connect with people
-                      who can help move your ideas forward.
-                    </p>
+                  <div className="rounded-2xl bg-teal-400/10 p-3 text-teal-300">
+                    <GraduationCap size={28} />
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-teal-400" />
-                  <p className="text-xs leading-5 text-slate-300">
-                    Start with your skills. Grow through real opportunities.
-                  </p>
+                <div className="space-y-4 py-6">
+                  {[
+                    { number: "01", icon: Search, title: "Discover opportunities", description: "Explore challenges from organizations." },
+                    { number: "02", icon: BookOpen, title: "Show your abilities", description: "Apply your skills to meaningful problems." },
+                    { number: "03", icon: Users, title: "Build something together", description: "Collaborate and turn ideas into outcomes." },
+                  ].map((item) => (
+                    <div
+                      key={item.number}
+                      className="group flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.035] p-4 transition-colors duration-200 hover:border-teal-400/30 hover:bg-white/[0.07]"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-400/10 text-teal-300">
+                        <item.icon size={22} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-white">{item.title}</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-400">{item.description}</p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-500">{item.number}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3 rounded-xl bg-teal-400/10 p-4">
+                  <CheckCircle2 size={20} className="shrink-0 text-teal-300" />
+                  <p className="text-sm leading-6 text-teal-100">Learn by doing. Grow through collaboration.</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
-        <section className="bg-slate-50 px-5 py-20 sm:px-8 lg:py-24">
+        {/* ─── Stats ─────────────────────────────────────────────── */}
+        <section className="border-y border-slate-200 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
+            <motion.div
+              variants={container}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className="grid grid-cols-2 gap-8 md:grid-cols-4"
+            >
+              {stats.map((stat) => (
+                <motion.div key={stat.label} variants={cardAnim} className="text-center">
+                  <p className="text-3xl font-extrabold text-[#102c46] sm:text-4xl">{stat.value}</p>
+                  <p className="mt-1.5 text-sm text-slate-500">{stat.label}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ─── Pathways ──────────────────────────────────────────── */}
+        <section className="bg-white px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
           <div className="mx-auto max-w-7xl">
             <SectionHeading
-              eyebrow="Find your pathway"
-              title="One community. Different ways to grow."
-              description="Whether you're developing your skills or looking for people to help solve a problem, start with the pathway that fits your goals."
+              eyebrow="Find your place"
+              title="One community. Different ways to make an impact."
+              description="Whether you are developing your abilities, building an organization, or looking for a problem worth solving, there is a path for you."
             />
 
-            <div className="grid gap-5 md:grid-cols-3">
-              <article className="rounded-2xl border border-slate-200 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-teal-50 text-xl text-teal-800">
-                  ↗
-                </span>
-                <h3 className="mt-5 text-xl font-bold text-slate-900">
-                  Grow as a talent
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Showcase your abilities, share your interests, and apply
-                  for challenges where you can make a contribution.
-                </p>
-                <Link
-                  to="/register"
-                  className="mt-6 inline-flex font-semibold text-teal-700 hover:text-teal-900"
+            <motion.div
+              variants={container}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-60px" }}
+              className="grid gap-5 md:grid-cols-3"
+            >
+              {[
+                {
+                  icon: GraduationCap,
+                  title: "For talents",
+                  description: "Discover practical opportunities, apply your skills, build projects, and make your abilities visible through meaningful work.",
+                  link: "/register",
+                  label: "Join as a talent",
+                  bg: "bg-teal-50",
+                  text: "text-teal-800",
+                },
+                {
+                  icon: BriefcaseBusiness,
+                  title: "For organizations",
+                  description: "Share real challenges, connect with capable people, and collaborate with talents who want to help solve meaningful problems.",
+                  link: "/register",
+                  label: "Join as an organization",
+                  bg: "bg-blue-50",
+                  text: "text-blue-800",
+                },
+                {
+                  icon: Globe2,
+                  title: "Explore opportunities",
+                  description: "Explore published challenges across Ethiopia and find opportunities that fit your interests and ambitions.",
+                  link: "/challenges",
+                  label: "Browse challenges",
+                  bg: "bg-violet-50",
+                  text: "text-violet-800",
+                },
+              ].map((pathway) => (
+                <motion.article
+                  key={pathway.title}
+                  variants={cardAnim}
+                  whileHover={{ y: -4 }}
+                  className="group rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"
                 >
-                  Create your profile →
-                </Link>
-              </article>
-
-              <article className="rounded-2xl border border-slate-200 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-blue-50 text-xl text-blue-800">
-                  +
-                </span>
-                <h3 className="mt-5 text-xl font-bold text-slate-900">
-                  Connect as an organization
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Introduce your organization, publish challenges after
-                  verification, and review applications from interested talents.
-                </p>
-                <Link
-                  to="/register"
-                  className="mt-6 inline-flex font-semibold text-teal-700 hover:text-teal-900"
-                >
-                  Register your organization →
-                </Link>
-              </article>
-
-              <article className="rounded-2xl border border-slate-200 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-violet-50 text-xl text-violet-800">
-                  ◎
-                </span>
-                <h3 className="mt-5 text-xl font-bold text-slate-900">
-                  Discover challenges
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Browse public opportunities and find problems that match
-                  your interests and the skills you want to develop.
-                </p>
-                <Link
-                  to="/challenges"
-                  className="mt-6 inline-flex font-semibold text-teal-700 hover:text-teal-900"
-                >
-                  Browse opportunities →
-                </Link>
-              </article>
-            </div>
+                  <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl ${pathway.bg} ${pathway.text}`}>
+                    <pathway.icon size={27} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">{pathway.title}</h3>
+                  <p className="mt-3 min-h-24 text-sm leading-7 text-slate-600">{pathway.description}</p>
+                  <Link
+                    to={pathway.link}
+                    className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-teal-800 transition-all group-hover:gap-3"
+                  >
+                    {pathway.label}
+                    <ArrowRight size={17} />
+                  </Link>
+                </motion.article>
+              ))}
+            </motion.div>
           </div>
         </section>
 
-        <section className="px-5 py-20 sm:px-8 lg:py-24">
+        {/* ─── Featured challenges ────────────────────────────────── */}
+        <section id="featured-challenges" className="bg-slate-50 px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
           <div className="mx-auto max-w-7xl">
-            <div className="mb-9 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
-                  Real opportunities
+            <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <motion.div
+                variants={fadeUp(0)}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                className="max-w-2xl"
+              >
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">Real opportunities</p>
+                <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Challenges worth solving</h2>
+                <p className="mt-4 leading-7 text-slate-600">
+                  Explore opportunities published by organizations. Every challenge shown here comes from the platform.
                 </p>
-                <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                  Featured challenges
-                </h2>
-                <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                  Explore opportunities published by organizations in the community.
-                </p>
-              </div>
+              </motion.div>
 
               <Link
                 to="/challenges"
-                className="w-fit font-semibold text-teal-700 hover:text-teal-900"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800 transition-colors hover:border-teal-700 hover:text-teal-800 sm:self-auto"
               >
-                View all challenges →
+                View all challenges
+                <ArrowRight size={17} />
               </Link>
             </div>
 
-            {challengeState === "loading" ? (
-              <div role="status" className="rounded-2xl border border-slate-200 p-10 text-center text-slate-600">
-                Loading published opportunities...
+            {loading ? (
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6">
+                    <div className="h-6 w-28 rounded-full bg-slate-200" />
+                    <div className="mt-6 h-6 w-4/5 rounded bg-slate-200" />
+                    <div className="mt-3 h-4 w-full rounded bg-slate-100" />
+                    <div className="mt-2 h-4 w-5/6 rounded bg-slate-100" />
+                    <div className="mt-8 h-11 rounded-xl bg-slate-100" />
+                  </div>
+                ))}
               </div>
-            ) : challengeState === "error" ? (
-              <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-8">
-                <h3 className="font-semibold text-slate-900">
-                  Challenges are temporarily unavailable
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  We couldn't retrieve current opportunities. Please visit the challenges page to try again.
-                </p>
-                <Link to="/challenges" className="mt-4 inline-block font-semibold text-teal-800">
-                  Open challenges →
-                </Link>
+            ) : error ? (
+              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-6 py-10 text-center">
+                <RefreshCw size={28} className="mx-auto text-red-400" />
+                <h3 className="mt-4 font-bold text-slate-900">We couldn't load the challenges</h3>
+                <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setRetryCount((c) => c + 1)}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+                >
+                  <RefreshCw size={15} />
+                  Try again
+                </button>
               </div>
             ) : challenges.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                <h3 className="text-lg font-bold text-slate-900">
-                  New opportunities are yet to be published
-                </h3>
-                <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600">
-                  There are no public challenges available right now. You can still join the community, prepare your profile, and check back for new opportunities.
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+                <BookOpen size={28} className="mx-auto text-teal-700" />
+                <h3 className="mt-5 text-xl font-bold text-slate-900">New opportunities are on the way</h3>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-slate-600">
+                  Check back later as organizations publish new opportunities.
                 </p>
-                <Link
-                  to="/register"
-                  className="mt-6 inline-flex rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-800"
-                >
-                  Get started
+                <Link to="/challenges" className="mt-6 inline-flex items-center gap-2 font-semibold text-teal-800 hover:text-teal-600">
+                  Explore the challenge directory <ArrowRight size={17} />
                 </Link>
               </div>
             ) : (
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {challenges.map((challenge) => (
-                  <ChallengeCard
-                    key={challenge._id ?? challenge.id}
-                    challenge={challenge}
-                  />
-                ))}
-              </div>
+              <>
+                <p className="mb-5 flex items-center gap-2 text-sm text-slate-500">
+                  <CheckCircle2 size={16} className="text-teal-700" />
+                  Showing {challenges.length} real published {challenges.length === 1 ? "challenge" : "challenges"}
+                </p>
+                <motion.div
+                  variants={container}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-60px" }}
+                  className="grid items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {challenges.map((challenge) => (
+                    <ChallengeCard key={challenge._id} challenge={challenge} />
+                  ))}
+                </motion.div>
+                <div className="mt-9 text-center">
+                  <Link
+                    to="/challenges"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-teal-800"
+                  >
+                    Discover more opportunities
+                    <ArrowRight size={18} />
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         </section>
 
-        <section className="bg-slate-50 px-5 py-20 sm:px-8 lg:py-24">
+        {/* ─── How it works ───────────────────────────────────────── */}
+        <section id="how-it-works" className="px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
           <div className="mx-auto max-w-7xl">
             <SectionHeading
-              eyebrow="Your journey"
-              title="Three steps to get started"
-              description="The community helps bring talented people and meaningful opportunities closer together."
+              eyebrow="A simple process"
+              title="Turn your ambition into action"
+              description="A clear path from discovering an opportunity to collaborating on a real project."
             />
 
-            <div className="grid gap-8 md:grid-cols-3">
+            <motion.div
+              variants={container}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-60px" }}
+              className="grid gap-8 md:grid-cols-3"
+            >
               {[
-                {
-                  number: "01",
-                  title: "Create your profile",
-                  description: "Register as a talent or an organization and provide the information needed to get started.",
-                },
-                {
-                  number: "02",
-                  title: "Discover opportunities",
-                  description: "Talents explore published challenges. Organizations prepare challenges and complete verification.",
-                },
-                {
-                  number: "03",
-                  title: "Apply and collaborate",
-                  description: "Talents submit applications. Organizations review candidates and work with accepted contributors.",
-                },
+                { number: "01", title: "Create your profile", description: "Introduce your interests, skills, experience, and the kind of work you want to pursue." },
+                { number: "02", title: "Find your opportunity", description: "Explore published challenges and apply to opportunities that interest you." },
+                { number: "03", title: "Collaborate and build", description: "Work toward expected deliverables, contribute to projects, and demonstrate what you can do." },
               ].map((step) => (
-                <article key={step.number} className="relative rounded-2xl border border-slate-200 bg-white p-7">
-                  <span className="text-sm font-extrabold tracking-widest text-teal-700">
-                    STEP {step.number}
-                  </span>
-                  <h3 className="mt-4 text-xl font-bold text-slate-900">
-                    {step.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    {step.description}
-                  </p>
-                </article>
+                <motion.article
+                  key={step.number}
+                  variants={cardAnim}
+                  whileHover={{ y: -4 }}
+                  className="rounded-2xl border border-slate-200 bg-white p-7"
+                >
+                  <p className="text-sm font-extrabold tracking-widest text-teal-700">STEP {step.number}</p>
+                  <h3 className="mt-5 text-xl font-bold text-slate-900">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{step.description}</p>
+                </motion.article>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
-        <section className="px-5 py-20 sm:px-8 lg:py-24">
-          <div className="mx-auto grid max-w-7xl gap-8 rounded-3xl bg-[#102c46] p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-center lg:p-14">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-300">
-                For organizations
-              </p>
-              <h2 className="mt-4 max-w-2xl text-3xl font-bold leading-tight text-white sm:text-4xl">
-                Have a challenge worth solving?
-              </h2>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                Bring your organization to Talent Community. Complete your
-                profile, go through verification, and share opportunities
-                that invite people to contribute their skills.
-              </p>
+        {/* ─── Talent showcase intro ──────────────────────────────── */}
+        <section className="bg-slate-50 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
+          <motion.div
+            variants={fadeUp(0)}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 rounded-3xl border border-slate-200 bg-white p-7 sm:p-10 lg:flex-row lg:items-center"
+          >
+            <div className="flex items-start gap-5">
+              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-800 sm:flex">
+                <Users size={27} />
+              </div>
+              <div className="max-w-2xl">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-700">Talent showcase</p>
+                <h2 className="mt-3 text-2xl font-extrabold text-slate-900 sm:text-3xl">Your work should speak for itself.</h2>
+                <p className="mt-3 leading-7 text-slate-600">
+                  Build your profile, develop practical projects, and make your skills easier for organizations to discover.
+                </p>
+              </div>
             </div>
-
             <Link
-              to="/register"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-6 py-4 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-teal-400"
+              to="/talents"
+              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-3 font-semibold text-white transition-colors hover:bg-teal-800"
             >
-              Join as an organization →
+              Browse talents
+              <ArrowRight size={18} />
             </Link>
-          </div>
+          </motion.div>
+        </section>
+
+        {/* ─── Organization CTA ───────────────────────────────────── */}
+        <section className="px-5 pb-20 sm:px-8 lg:px-10 lg:pb-24">
+          <motion.div
+            variants={fadeUp(0)}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl bg-teal-800 px-7 py-12 sm:px-12 sm:py-16"
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[40px] border-white/5" />
+
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-center">
+              <div className="max-w-2xl">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-200">For organizations</p>
+                <h2 className="mt-3 text-3xl font-extrabold leading-tight text-white sm:text-4xl">Have a challenge worth solving?</h2>
+                <p className="mt-4 max-w-xl leading-7 text-teal-50/90">
+                  Bring your real-world problems to a community of emerging talent. Publish opportunities, connect with capable people,
+                  and support practical learning through real projects.
+                </p>
+              </div>
+              <Link
+                to="/register"
+                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-white px-6 py-3 font-bold text-teal-900 transition-all hover:-translate-y-0.5 hover:bg-teal-50"
+              >
+                Join as an organization
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+          </motion.div>
         </section>
       </main>
 
