@@ -1,6 +1,7 @@
 import {
   createTalentProfile,
   findTalentProfileByUserId,
+  findTalentProfiles,
   updateTalentProfileByUserId,
 } from "../repositories/talent-profile.repository.js";
 
@@ -79,4 +80,25 @@ export const updateMyTalentProfile = async (userId, data = {}) => {
   }
 
   return profile;
+};
+
+export const browseTalentProfiles = async ({ page = 1, limit = 20 } = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+
+  const filter = { visibility: "public" };
+
+  const profiles = await findTalentProfiles(filter, {
+    skip: (safePage - 1) * safeLimit,
+    limit: safeLimit,
+  });
+
+  // Count is not on the repository yet; derive pagination from results length
+  return {
+    profiles,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+    },
+  };
 };

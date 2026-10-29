@@ -6,6 +6,7 @@ import {
   getProjectByIdHandler,
   updateMyProjectHandler,
   updateMyProjectStatusHandler,
+  getProjectByChallengeHandler,
 } from "../controllers/project.controller.js";
 
 import { protect, authorize } from "../middleware/auth.middleware.js";
@@ -41,6 +42,13 @@ router.patch(
   "/:id",
   authorize("organization"),
   updateMyProjectHandler,
+);
+
+// Talent: retrieve a project by its challenge ID.
+router.get(
+  "/by-challenge/:challengeId",
+  authorize("talent"),
+  getProjectByChallengeHandler,
 );
 
 // Talent or organization: retrieve a project.

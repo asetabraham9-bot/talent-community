@@ -17,8 +17,10 @@ const cardVariant = {
 };
 
 function TalentCard({ talent }) {
-  const skills = Array.isArray(talent.skills) ? talent.skills : [];
-  const displayName = talent.name ?? talent.user?.name ?? "Talent";
+  const skills = Array.isArray(talent.skills)
+    ? talent.skills.map((s) => (typeof s === "string" ? s : s.name))
+    : [];
+  const displayName = talent.user?.fullName ?? "Talent";
   const initials = displayName
     .split(" ")
     .slice(0, 2)

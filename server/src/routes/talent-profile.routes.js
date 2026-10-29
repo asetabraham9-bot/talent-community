@@ -1,6 +1,7 @@
 
 import { Router } from "express";
 import {
+  browseProfiles,
   getMyProfile,
   createMyProfile,
   updateMyProfile,
@@ -12,6 +13,10 @@ import {
 
 const router = Router();
 
+// Public: browse all public talent profiles (no auth required)
+router.get("/", browseProfiles);
+
+// All routes below require authentication as a talent
 router.use(protect, authorize("talent"));
 
 router.get("/profile", getMyProfile);

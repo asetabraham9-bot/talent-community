@@ -15,6 +15,7 @@ const router = Router();
 router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);
 router.use("/talent", talentProfileRoutes);
+router.use("/talent-profiles", talentProfileRoutes);
 router.use("/organization", organizationProfileRoutes);
 router.use("/admin", adminRoutes);
 router.use("/challenges", challengeRoutes);

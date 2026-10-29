@@ -95,13 +95,13 @@ export default function ChallengeDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  async function handleApply() {
+  async function handleApply(coverMessage) {
     setApplying(true);
     setApplyError("");
     try {
       await apiRequest("/applications", {
         method: "POST",
-        body: JSON.stringify({ challengeId: id }),
+        body: JSON.stringify({ challengeId: id, coverMessage }),
       });
       setApplyStatus("success");
     } catch (err) {
@@ -353,6 +353,36 @@ function ApplyPanel({
   const deadline = challenge.deadline;
   const isPast = deadline && getDaysRemaining(deadline) < 0;
 
+  const [applyStep, setApplyStep] = useState("idle"); // idle | form | submitting
+  const [coverMessage, setCoverMessage] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  function handleOpenForm() {
+    setApplyStep("form");
+    setLocalError("");
+    setCoverMessage("");
+  }
+
+  function handleCancel() {
+    setApplyStep("idle");
+    setLocalError("");
+    setCoverMessage("");
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (coverMessage.trim().length < 20) {
+      setLocalError("Cover message must be at least 20 characters.");
+      return;
+    }
+    setApplyStep("submitting");
+    await onApply(coverMessage.trim());
+    // parent sets applyStatus; if error occurs, go back to form
+    if (applyStatus !== "success") {
+      setApplyStep("form");
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       {applyStatus === "success" ? (
@@ -361,9 +391,64 @@ function ApplyPanel({
           <p className="mt-3 font-bold text-slate-900">Application submitted!</p>
           <p className="mt-1 text-sm text-slate-600">
             The organization will review your application and reach out if
-            you're selected.
+            you&apos;re selected.
           </p>
         </div>
+      ) : applyStep === "form" || applyStep === "submitting" ? (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm font-semibold text-slate-700">Your application</p>
+
+          {(applyError || localError) && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800"
+            >
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              {localError || applyError}
+            </div>
+          )}
+
+          <div>
+            <label
+              htmlFor="cover-message"
+              className="mb-1.5 block text-xs font-semibold text-slate-600"
+            >
+              Cover message <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="cover-message"
+              rows={5}
+              required
+              minLength={20}
+              maxLength={3000}
+              value={coverMessage}
+              onChange={(e) => { setCoverMessage(e.target.value); setLocalError(""); }}
+              placeholder="Tell the organization why you're a great fit for this challenge…"
+              className="block w-full resize-none rounded-xl border border-slate-300 px-4 py-2.5 text-sm placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+            />
+            <p className="mt-1 text-right text-xs text-slate-400">
+              {coverMessage.length}/3000 — min 20 characters
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={applyStep === "submitting"}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-teal-800 disabled:opacity-60"
+            >
+              {applyStep === "submitting" ? "Submitting…" : "Submit"}
+              {applyStep !== "submitting" && <ArrowRight size={15} />}
+            </button>
+          </div>
+        </form>
       ) : (
         <>
           <p className="text-sm font-semibold text-slate-700">
@@ -412,12 +497,12 @@ function ApplyPanel({
             ) : (
               <button
                 type="button"
+                onClick={handleOpenForm}
                 disabled={applying}
-                onClick={onApply}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-800 disabled:opacity-60"
               >
-                {applying ? "Submitting…" : "Apply to this challenge"}
-                {!applying && <ArrowRight size={16} />}
+                Apply to this challenge
+                <ArrowRight size={16} />
               </button>
             )}
           </div>

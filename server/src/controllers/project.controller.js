@@ -4,6 +4,7 @@ import {
   getProjectById,
   updateMyProject,
   updateMyProjectStatus,
+  getProjectByChallengeForTalent,
 } from "../services/project.service.js";
 
 // Create or retrieve the shared project for a challenge.
@@ -87,6 +88,23 @@ export const updateMyProjectStatusHandler = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Project status updated successfully.",
+      data: project,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Talent: retrieve a project linked to a specific challenge.
+export const getProjectByChallengeHandler = async (req, res, next) => {
+  try {
+    const project = await getProjectByChallengeForTalent(
+      req.user.id,
+      req.params.challengeId,
+    );
+
+    return res.status(200).json({
+      success: true,
       data: project,
     });
   } catch (error) {

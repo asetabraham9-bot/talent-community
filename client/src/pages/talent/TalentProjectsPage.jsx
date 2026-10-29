@@ -116,39 +116,39 @@ export default function TalentProjectsPage() {
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
 
-  // Talent projects come from accepted applications — list by checking project/:id on each accepted app
-  // The API serves projects via /projects/:id for talent. There's no direct /projects/my for talents,
-  // so we first load accepted applications then load each project by ID.
+  // Talent projects come from accepted applications. For each accepted
+  // application we fetch the project keyed by that application's challenge ID.
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      // Get accepted applications
+      // Get all applications for this talent
       const appsRes = await apiRequest("/applications/my");
       const appsData = appsRes?.data;
-      const apps = Array.isArray(appsData) ? appsData : (Array.isArray(appsData?.applications) ? appsData.applications : []);
-      const accepted = apps.filter(a => a.status === "accepted");
+      const apps = Array.isArray(appsData)
+        ? appsData
+        : Array.isArray(appsData?.applications)
+          ? appsData.applications
+          : [];
+      const accepted = apps.filter((a) => a.status === "accepted");
 
       if (accepted.length === 0) {
         setProjects([]);
         return;
       }
 
-      // For each accepted application's challenge, try to get the project
+      // Fetch the project for each accepted application by challenge ID
       const projectResults = await Promise.allSettled(
-        accepted.map(a => {
+        accepted.map((a) => {
           const cid = a.challenge?._id ?? a.challenge;
           if (!cid) return Promise.resolve(null);
-          // There's no direct lookup by challenge from talent side; try by app's linked project
-          return a.project
-            ? apiRequest(`/projects/${a.project}`)
-            : Promise.resolve(null);
+          return apiRequest(`/projects/by-challenge/${cid}`);
         })
       );
 
       const loaded = projectResults
-        .filter(r => r.status === "fulfilled" && r.value?.data)
-        .map(r => r.value.data);
+        .filter((r) => r.status === "fulfilled" && r.value?.data)
+        .map((r) => r.value.data);
 
       setProjects(loaded);
     } catch (err) {

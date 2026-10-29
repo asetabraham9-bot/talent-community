@@ -294,3 +294,27 @@ export const updateMyProjectStatus = async (
 
   return updateProjectById(projectId, updates);
 };
+
+// Retrieve a project by its challenge ID for a talent contributor.
+export const getProjectByChallengeForTalent = async (userId, challengeId) => {
+  requireValidId(challengeId, "challenge ID");
+
+  const project = await findProjectByChallengeId(challengeId);
+
+  if (!project) {
+    throw serviceError("No project found for this challenge.", 404);
+  }
+
+  const isContributor = project.contributors.some((id) =>
+    isSameId(id, userId),
+  );
+
+  if (!isContributor && project.visibility !== "public") {
+    throw serviceError(
+      "You do not have permission to view this project.",
+      403,
+    );
+  }
+
+  return project;
+};

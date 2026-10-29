@@ -2,6 +2,7 @@ import {
   getMyTalentProfile,
   createMyTalentProfile,
   updateMyTalentProfile,
+  browseTalentProfiles,
 } from "../services/talent-profile.service.js";
 
 export const getMyProfile = async (req, res, next) => {
@@ -45,6 +46,20 @@ export const updateMyProfile = async (req, res, next) => {
       success: true,
       message: "Talent profile updated successfully.",
       data: { profile },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const browseProfiles = async (req, res, next) => {
+  try {
+    const result = await browseTalentProfiles(req.query);
+
+    return res.status(200).json({
+      success: true,
+      data: result.profiles,
+      pagination: result.pagination,
     });
   } catch (error) {
     return next(error);

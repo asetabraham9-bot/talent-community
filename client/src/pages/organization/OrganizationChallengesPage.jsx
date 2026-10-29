@@ -85,6 +85,18 @@ function emptyForm() {
   };
 }
 
+// ─── Field label wrapper ─────────────────────────────────────
+function Field({ label, children, required }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+        {label}{required && <span className="ml-0.5 text-red-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 // ─── Challenge form modal ────────────────────────────────────
 function ChallengeFormModal({ initial = null, onClose, onSaved }) {
   const isEditing = Boolean(initial?._id);
@@ -135,17 +147,6 @@ function ChallengeFormModal({ initial = null, onClose, onSaved }) {
     } finally {
       setSaving(false);
     }
-  }
-
-  function Field({ label, children, required }) {
-    return (
-      <div>
-        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-          {label}{required && <span className="ml-0.5 text-red-500">*</span>}
-        </label>
-        {children}
-      </div>
-    );
   }
 
   const inputClass = "block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20";
