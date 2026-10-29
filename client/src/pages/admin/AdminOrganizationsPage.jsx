@@ -223,18 +223,12 @@ export default function AdminOrganizationsPage() {
     setLoading(true);
     setError("");
     try {
-      // API only has /admin/organizations/pending — we use that for pending filter
-      // For other statuses we'd need a different endpoint; handle gracefully
-      if (statusFilter === "pending") {
-        const res = await apiRequest(`/admin/organizations/pending?page=${page}&limit=20`);
-        const d = res?.data;
-        setOrgs(Array.isArray(d?.organizations) ? d.organizations : []);
-        setPagination(d?.pagination ?? { page: 1, total: 0, totalPages: 1 });
-      } else {
-        // No admin endpoint for all orgs — show empty state with note
-        setOrgs([]);
-        setPagination({ page: 1, total: 0, totalPages: 1 });
-      }
+      // Use the new all-organizations endpoint with status filter
+      const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
+      const res = await apiRequest(`/admin/organizations?page=${page}&limit=20${statusParam}`);
+      const d = res?.data;
+      setOrgs(Array.isArray(d?.organizations) ? d.organizations : []);
+      setPagination(d?.pagination ?? { page: 1, total: 0, totalPages: 1 });
     } catch (err) {
       setError(err.message || "Failed to load organizations.");
     } finally {

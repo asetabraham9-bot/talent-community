@@ -23,3 +23,16 @@ export const updateUserById = (userId, updates) => {
     runValidators: true,
   });
 };
+
+export const findUsers = (filter = {}, options = {}) => {
+  const { skip = 0, limit = 20, sort = { createdAt: -1 } } = options;
+
+  return User.find(filter)
+    .sort(sort)
+    .skip(skip)
+    .limit(limit);
+};
+
+export const countUsers = (filter = {}) => {
+  return User.countDocuments(filter);
+};

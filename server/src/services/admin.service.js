@@ -1,4 +1,9 @@
-import { findUserById, updateUserById, } from "../repositories/user.repository.js";
+import { 
+  findUserById, 
+  updateUserById,
+  findUsers,
+  countUsers,
+} from "../repositories/user.repository.js";
 import mongoose from "mongoose";
 import {
   findOrganizationProfiles,
@@ -6,7 +11,14 @@ import {
   findOrganizationProfileById,
   updateOrganizationProfileById,
 } from "../repositories/organization-profile.repository.js";
-import { createAuditLog } from "../repositories/audit-log.repository.js";
+import { 
+  createAuditLog,
+  findAuditLogs,
+  countAuditLogs,
+  findAuditLogById,
+  updateAuditLogById,
+  deleteAuditLogById,
+} from "../repositories/audit-log.repository.js";
 
 export const getAdminProfile = async (userId) => {
   const user = await findUserById(userId);
@@ -334,4 +346,240 @@ export const reactivateUserAccount = async (
     reason,
     "user_reactivated"
   );
+};
+
+
+export const getAllOrganizations = async ({
+  page = 1,
+  limit = 20,
+  status,
+} = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+
+  const filter = {};
+  
+  if (status && ['pending', 'verified', 'rejected'].includes(status)) {
+    filter.verificationStatus = status;
+  }
+
+  const [organizations, total] = await Promise.all([
+    findOrganizationProfiles(filter, {
+      skip: (safePage - 1) * safeLimit,
+      limit: safeLimit,
+      sort: { createdAt: -1 },
+    }),
+    countOrganizationProfiles(filter),
+  ]);
+
+  return {
+    organizations: organizations.map((organization) => ({
+      id: organization._id.toString(),
+      userId: organization.user?.toString(),
+      organizationName: organization.organizationName,
+      organizationType: organization.organizationType,
+      description: organization.description,
+      location: organization.location,
+      website: organization.website,
+      contactEmail: organization.contactEmail,
+      verificationStatus: organization.verificationStatus,
+      verificationNotes: organization.verificationNotes,
+      reviewedBy: organization.reviewedBy?.toString(),
+      reviewedAt: organization.reviewedAt,
+      createdAt: organization.createdAt,
+      updatedAt: organization.updatedAt,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  };
+};
+
+export const getAllUsers = async ({
+  page = 1,
+  limit = 20,
+  role,
+  status,
+} = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+
+  const filter = {};
+  
+  if (role && ['talent', 'organization', 'admin'].includes(role)) {
+    filter.role = role;
+  }
+  
+  if (status && ['active', 'suspended', 'deleted'].includes(status)) {
+    filter.status = status;
+  }
+
+  const [users, total] = await Promise.all([
+    findUsers(filter, {
+      skip: (safePage - 1) * safeLimit,
+      limit: safeLimit,
+      sort: { createdAt: -1 },
+    }),
+    countUsers(filter),
+  ]);
+
+  return {
+    users: users.map((user) => ({
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      isEmailVerified: user.isEmailVerified,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  };
+};
+
+export const getAllAuditLogs = async ({
+  page = 1,
+  limit = 20,
+  resourceType,
+  actor,
+} = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+
+  const filter = {};
+  
+  if (resourceType && ['user', 'talent_profile', 'organization', 'challenge', 'application', 'project', 'system'].includes(resourceType)) {
+    filter.resourceType = resourceType;
+  }
+  
+  if (actor && mongoose.isValidObjectId(actor)) {
+    filter.actor = actor;
+  }
+
+  const [logs, total] = await Promise.all([
+    findAuditLogs(filter, {
+      skip: (safePage - 1) * safeLimit,
+      limit: safeLimit,
+    }),
+    countAuditLogs(filter),
+  ]);
+
+  return {
+    logs: logs.map((log) => ({
+      id: log._id.toString(),
+      actor: log.actor?.toString(),
+      action: log.action,
+      resourceType: log.resourceType,
+      resourceId: log.resourceId?.toString(),
+      reason: log.reason,
+      metadata: log.metadata,
+      createdAt: log.createdAt,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  };
+};
+
+export const createNewAuditLog = async (logData) => {
+  const { actor, action, resourceType, resourceId, reason, metadata } = logData;
+
+  if (!action || typeof action !== 'string') {
+    const error = new Error('Action is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!resourceType || !['user', 'talent_profile', 'organization', 'challenge', 'application', 'project', 'system'].includes(resourceType)) {
+    const error = new Error('Valid resourceType is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const log = await createAuditLog({
+    actor: actor || null,
+    action: action.trim(),
+    resourceType,
+    resourceId: resourceId || null,
+    reason: reason?.trim() || '',
+    metadata: metadata || undefined,
+  });
+
+  return {
+    id: log._id.toString(),
+    actor: log.actor?.toString(),
+    action: log.action,
+    resourceType: log.resourceType,
+    resourceId: log.resourceId?.toString(),
+    reason: log.reason,
+    metadata: log.metadata,
+    createdAt: log.createdAt,
+  };
+};
+
+export const updateAuditLog = async (logId, updates) => {
+  if (!mongoose.isValidObjectId(logId)) {
+    const error = new Error('Invalid audit log ID.');
+    error.status = 400;
+    throw error;
+  }
+
+  const log = await findAuditLogById(logId);
+  
+  if (!log) {
+    const error = new Error('Audit log not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const allowedUpdates = {};
+  if (updates.reason !== undefined) allowedUpdates.reason = updates.reason.trim();
+  if (updates.metadata !== undefined) allowedUpdates.metadata = updates.metadata;
+
+  const updatedLog = await updateAuditLogById(logId, allowedUpdates);
+
+  return {
+    id: updatedLog._id.toString(),
+    actor: updatedLog.actor?.toString(),
+    action: updatedLog.action,
+    resourceType: updatedLog.resourceType,
+    resourceId: updatedLog.resourceId?.toString(),
+    reason: updatedLog.reason,
+    metadata: updatedLog.metadata,
+    createdAt: updatedLog.createdAt,
+  };
+};
+
+export const deleteAuditLog = async (logId) => {
+  if (!mongoose.isValidObjectId(logId)) {
+    const error = new Error('Invalid audit log ID.');
+    error.status = 400;
+    throw error;
+  }
+
+  const log = await deleteAuditLogById(logId);
+  
+  if (!log) {
+    const error = new Error('Audit log not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  return {
+    id: log._id.toString(),
+    message: 'Audit log deleted successfully.',
+  };
 };

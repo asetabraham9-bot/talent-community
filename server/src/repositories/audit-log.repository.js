@@ -20,3 +20,14 @@ export const findAuditLogs = (filter = {}, options = {}) => {
 export const countAuditLogs = (filter = {}) => {
   return AuditLog.countDocuments(filter);
 };
+
+export const updateAuditLogById = (logId, updates) => {
+  return AuditLog.findByIdAndUpdate(logId, updates, {
+    new: true,
+    runValidators: true,
+  });
+};
+
+export const deleteAuditLogById = (logId) => {
+  return AuditLog.findByIdAndDelete(logId);
+};

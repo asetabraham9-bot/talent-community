@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   PauseCircle,
   PlayCircle,
@@ -23,7 +25,7 @@ const fadeUp = {
 const STATUS_STYLES = {
   active:    { bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500",  label: "Active" },
   suspended: { bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-400",    label: "Suspended" },
-  pending:   { bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-400",  label: "Pending" },
+  deleted:   { bg: "bg-slate-50",  text: "text-slate-700",  dot: "bg-slate-400",  label: "Deleted" },
 };
 
 function StatusBadge({ status }) {
@@ -86,7 +88,7 @@ function ActionModal({ user, action, onClose, onDone }) {
                 {isSuspend ? "This user will lose access to the platform." : "This user will regain access to the platform."}
               </p>
               <p className={`mt-0.5 text-xs ${isSuspend ? "text-red-700" : "text-green-700"}`}>
-                {user.name} ({user.email})
+                {user.fullName} ({user.email})
               </p>
             </div>
           </div>
@@ -128,47 +130,47 @@ function ActionModal({ user, action, onClose, onDone }) {
   );
 }
 
-// ─── Lookup result card ──────────────────────────────────────
-function UserResultCard({ result, onAction }) {
-  const canSuspend = result.status === "active" && result.role !== "admin";
-  const canReactivate = result.status === "suspended";
+// ─── User card ───────────────────────────────────────────────
+function UserCard({ user, onAction }) {
+  const canSuspend = user.status === "active" && user.role !== "admin";
+  const canReactivate = user.status === "suspended";
 
   return (
     <motion.div variants={fadeUp}
       className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start gap-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700 text-sm font-bold">
-          {result.name?.[0]?.toUpperCase() ?? <User size={18} />}
+          {user.fullName?.[0]?.toUpperCase() ?? <User size={18} />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="font-semibold text-slate-900">{result.name}</p>
-              <p className="text-xs text-slate-500">{result.email}</p>
+              <p className="font-semibold text-slate-900">{user.fullName}</p>
+              <p className="text-xs text-slate-500">{user.email}</p>
               <p className="mt-0.5 flex items-center gap-1 text-xs capitalize text-slate-400">
-                {result.role === "admin" && <Shield size={11} />}
-                {result.role}
+                {user.role === "admin" && <Shield size={11} />}
+                {user.role}
               </p>
             </div>
-            <StatusBadge status={result.status} />
+            <StatusBadge status={user.status} />
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
             {canSuspend && (
-              <button type="button" onClick={() => onAction(result, "suspend")}
+              <button type="button" onClick={() => onAction(user, "suspend")}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">
                 <PauseCircle size={13} /> Suspend
               </button>
             )}
             {canReactivate && (
-              <button type="button" onClick={() => onAction(result, "reactivate")}
+              <button type="button" onClick={() => onAction(user, "reactivate")}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100">
                 <PlayCircle size={13} /> Reactivate
               </button>
             )}
-            {result.role === "admin" && (
+            {user.role === "admin" && (
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
-                <Shield size={13} /> Admin accounts cannot be moderated
+                <Shield size={13} /> Admin account
               </span>
             )}
           </div>
@@ -179,36 +181,52 @@ function UserResultCard({ result, onAction }) {
 }
 
 // ─── Page ────────────────────────────────────────────────────
-// Note: The backend has no endpoint to list all users. Admin can only
-// suspend/reactivate users by their ID. This page provides a manual
-// lookup-by-ID or direct ID action flow.
 export default function AdminUsersPage() {
-  const [userId, setUserId] = useState("");
-  const [lookupResult, setLookupResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [actionTarget, setActionTarget] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
-  // Simulate a lookup by trying to suspend/reactivate — instead we can try
-  // loading the profile via auth context or a test call. Since backend does
-  // not expose GET /admin/users/:id, we expose the action modals directly.
-  async function handleSuspend() {
-    if (!userId.trim()) return;
-    setActionTarget({ id: userId.trim(), name: userId.trim(), email: "—", status: "active", role: "talent" });
-  }
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const roleParam = roleFilter !== "all" ? `&role=${roleFilter}` : "";
+      const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
+      const res = await apiRequest(`/admin/users?page=${page}&limit=20${roleParam}${statusParam}`);
+      const d = res?.data;
+      setUsers(Array.isArray(d?.users) ? d.users : []);
+      setPagination(d?.pagination ?? { page: 1, total: 0, totalPages: 1 });
+    } catch (err) {
+      setError(err.message || "Failed to load users.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, roleFilter, statusFilter, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleReactivate() {
-    if (!userId.trim()) return;
-    setActionTarget({ id: userId.trim(), name: userId.trim(), email: "—", status: "suspended", role: "talent" });
-  }
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   function handleDone(updated) {
     setActionTarget(null);
-    setUserId("");
     setSuccessMsg(`User ${updated.fullName ?? "account"} status updated to "${updated.status}".`);
     setTimeout(() => setSuccessMsg(""), 5000);
+    setRetryKey(k => k + 1);
   }
+
+  // Client-side search filter
+  const displayedUsers = searchTerm.trim()
+    ? users.filter(u => 
+        u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : users;
 
   return (
     <div className="space-y-6">
@@ -216,19 +234,7 @@ export default function AdminUsersPage() {
       <motion.div variants={fadeUp} initial="hidden" animate="visible">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Admin Workspace</p>
         <h2 className="mt-1 text-2xl font-extrabold text-slate-900">User Management</h2>
-        <p className="mt-1 text-sm text-slate-500">Suspend or reactivate user accounts by their User ID.</p>
-      </motion.div>
-
-      {/* Notice */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible"
-        className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <AlertCircle size={17} className="mt-0.5 shrink-0" />
-        <div>
-          <p className="font-semibold">Platform user list is not exposed via API</p>
-          <p className="mt-0.5 text-xs">
-            Enter the MongoDB User ID of an account to moderate it. You can find user IDs via direct database access or reported by users.
-          </p>
-        </div>
+        <p className="mt-1 text-sm text-slate-500">View and moderate all platform users.</p>
       </motion.div>
 
       {/* Success alert */}
@@ -242,116 +248,110 @@ export default function AdminUsersPage() {
         )}
       </AnimatePresence>
 
-      {/* Action card */}
+      {/* Filters */}
       <motion.div variants={fadeUp} initial="hidden" animate="visible"
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-base font-bold text-slate-900">Moderate a User Account</h3>
-
-        <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">User ID (MongoDB ObjectId)</label>
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="e.g. 64f1a2b3c4d5e6f7a8b9c0d1"
-                  value={userId}
-                  onChange={e => { setUserId(e.target.value); setError(""); }}
-                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                />
-              </div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Search</label>
+            <div className="relative">
+              <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Name or email…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+              />
             </div>
           </div>
 
-          {error && (
-            <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <AlertCircle size={15} className="mt-0.5 shrink-0" />{error}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Role</label>
+            <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20">
+              <option value="all">All Roles</option>
+              <option value="talent">Talent</option>
+              <option value="organization">Organization</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Status</label>
+            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20">
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="deleted">Deleted</option>
+            </select>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Loading / Error */}
+      {loading && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible"
+          className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 py-12 text-slate-600">
+          <Loader2 size={20} className="animate-spin" /> Loading users…
+        </motion.div>
+      )}
+
+      {error && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible"
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />{error}
+        </motion.div>
+      )}
+
+      {/* User list */}
+      {!loading && !error && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="space-y-4">
+          {displayedUsers.length === 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 py-12 text-center text-slate-500">
+              <User size={40} className="text-slate-300" />
+              <p className="text-sm font-semibold">No users found</p>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3">
+          {displayedUsers.map(user => (
+            <UserCard key={user.id} user={user} onAction={(u, a) => setActionTarget({ ...u, action: a })} />
+          ))}
+        </motion.div>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && pagination.totalPages > 1 && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible"
+          className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-3">
+          <p className="text-sm text-slate-600">
+            Page <span className="font-bold">{pagination.page}</span> of <span className="font-bold">{pagination.totalPages}</span>
+            {" "} · {pagination.total} total users
+          </p>
+          <div className="flex gap-2">
             <button
-              type="button"
-              disabled={!userId.trim() || loading}
-              onClick={handleSuspend}
-              className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <PauseCircle size={15} />}
-              Suspend this user
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+              <ChevronLeft size={16} />
             </button>
             <button
-              type="button"
-              disabled={!userId.trim() || loading}
-              onClick={handleReactivate}
-              className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-60"
-            >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <PlayCircle size={15} />}
-              Reactivate this user
+              onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={page === pagination.totalPages}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+              <ChevronRight size={16} />
             </button>
           </div>
-
-          <p className="text-xs text-slate-400">
-            Clicking the button will open a confirmation dialog asking for a moderation reason.
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Quick reference */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible"
-        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-base font-bold text-slate-900">Moderation Guide</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            {
-              icon: PauseCircle,
-              title: "Suspend Account",
-              color: "text-red-600",
-              bg: "bg-red-50",
-              items: [
-                "Blocks all login attempts",
-                "Does not delete any data",
-                "Requires a documented reason",
-                "Only affects non-admin accounts",
-              ],
-            },
-            {
-              icon: PlayCircle,
-              title: "Reactivate Account",
-              color: "text-green-600",
-              bg: "bg-green-50",
-              items: [
-                "Restores full platform access",
-                "User can log in again",
-                "Requires a documented reason",
-                "Only works on suspended accounts",
-              ],
-            },
-          ].map(card => (
-            <div key={card.title} className={`rounded-xl border ${card.bg} p-4`}>
-              <div className={`mb-3 flex items-center gap-2 font-semibold ${card.color}`}>
-                <card.icon size={17} />
-                {card.title}
-              </div>
-              <ul className="space-y-1.5">
-                {card.items.map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                    <span className={`h-1.5 w-1.5 rounded-full ${card.bg === "bg-red-50" ? "bg-red-400" : "bg-green-400"}`} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Action modal */}
       <AnimatePresence>
         {actionTarget && (
           <ActionModal
             user={actionTarget}
-            action={actionTarget.status === "active" ? "suspend" : "reactivate"}
+            action={actionTarget.action}
             onClose={() => setActionTarget(null)}
             onDone={handleDone}
           />
