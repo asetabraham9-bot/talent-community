@@ -18,7 +18,6 @@ const router = Router();
 
 // Public routes
 router.get("/", browseChallengesHandler);
-router.get("/:id", getPublicChallengeHandler);
 
 // Organization-only routes
 router.post(
@@ -28,12 +27,15 @@ router.post(
   createChallengeHandler
 );
 
+// Must be declared BEFORE /:id so Express doesn't treat "my" as an id param
 router.get(
   "/my",
   protect,
   authorize("organization"),
   getMyChallengesHandler
 );
+
+router.get("/:id", getPublicChallengeHandler);
 
 router.patch(
   "/:id",

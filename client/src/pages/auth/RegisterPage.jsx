@@ -46,7 +46,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1); // 1 = role select, 2 = form
   const [direction, setDirection] = useState(1);
   const [selectedRole, setSelectedRole] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -252,18 +252,18 @@ export default function RegisterPage() {
                 <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
                   <div>
                     <label
-                      htmlFor="name"
+                      htmlFor="fullName"
                       className="mb-1.5 block text-sm font-semibold text-slate-700"
                     >
                       {selectedRole === "organization" ? "Organization name" : "Full name"}
                     </label>
                     <input
-                      id="name"
-                      name="name"
+                      id="fullName"
+                      name="fullName"
                       type="text"
                       autoComplete="name"
                       required
-                      value={form.name}
+                      value={form.fullName}
                       onChange={handleChange}
                       placeholder={
                         selectedRole === "organization"
