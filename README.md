@@ -221,6 +221,29 @@ All endpoints are prefixed with `/api`.
 
 ---
 
+## 🚀 Deployment
+
+### Live Demo
+
+The platform is deployed on Render:
+
+- **Frontend:** `https://talent-community-client.onrender.com`
+- **Backend API:** `https://talent-community-api.onrender.com`
+- **Health Check:** `https://talent-community-api.onrender.com/api/health`
+
+### Deploy Your Own
+
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for quick deployment instructions, or the complete **[Render Deployment Guide](./docs/RENDER_DEPLOYMENT_GUIDE.md)** for detailed steps.
+
+**Quick Deploy:**
+1. Fork this repository
+2. Sign up at [render.com](https://render.com)
+3. Connect your repo and deploy via Blueprint (detects `render.yaml`)
+4. Configure MongoDB URI in environment variables
+5. Done! ✅
+
+---
+
 ## Getting Started
 
 ### Prerequisites
