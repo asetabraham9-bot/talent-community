@@ -21,10 +21,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CLIENT_URL
-        fromService:
-          type: web
-          name: talent-community-client
-          property: host
+        value: https://talent-community-client.onrender.com
     healthCheckPath: /api/health
 
   # Frontend Static Site
@@ -39,10 +36,7 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: talent-community-api
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://talent-community-api.onrender.com/api
     routes:
       - type: rewrite
         source: /*
