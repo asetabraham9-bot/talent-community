@@ -32,7 +32,7 @@ const roles = [
   {
     id: "organization",
     icon: Building2,
-    title: "I'm an organization",
+    title: "I'm an organization Owner",
     description:
       "Share real problems, collaborate with talented people, and support practical learning.",
     color: "blue",
